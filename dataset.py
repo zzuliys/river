@@ -2,7 +2,6 @@ import os
 import cv2
 import numpy as np
 import torch
-import time
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 
@@ -25,7 +24,6 @@ class RiverDataset(Dataset):
         return len(self.image_files)
 
     def __getitem__(self, idx):
-        t0 = time.time()
         img_name = self.image_files[idx]
         img_path = os.path.join(self.images_dir, img_name)
 
@@ -49,6 +47,6 @@ class RiverDataset(Dataset):
         label = torch.from_numpy(label).long() // 255
         return img, label
 
-def get_dataloader(images_dir, labels_dir, batch_size, num_workers, image_size=512, shuffle=True, prefetch_factor=2):
+def get_dataloader(images_dir, labels_dir, batch_size, num_workers, image_size=512, shuffle=True, prefetch_factor=2, persistent_workers=True):
     dataset = RiverDataset(images_dir, labels_dir, image_size=image_size)
-    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, pin_memory=True, prefetch_factor=prefetch_factor)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, pin_memory=True, prefetch_factor=prefetch_factor, persistent_workers=persistent_workers)

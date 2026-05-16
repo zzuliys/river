@@ -153,6 +153,7 @@ def main():
     print(f"Automatic Mixed Precision (AMP): {'Enabled' if use_amp else 'Disabled'}")
     print(f"Channels Last Memory Format: {'Enabled' if use_channels_last else 'Disabled'}")
     print(f"Prefetch Factor: {Config.PREFETCH_FACTOR}")
+    print(f"Persistent Workers: {'Enabled' if Config.PERSISTENT_WORKERS else 'Disabled'}")
 
     model = UNet(in_channels=Config.IN_CHANNELS, num_classes=Config.NUM_CLASSES).to(device)
 
@@ -170,7 +171,8 @@ def main():
         Config.NUM_WORKERS,
         Config.IMAGE_SIZE,
         shuffle=True,
-        prefetch_factor=Config.PREFETCH_FACTOR
+        prefetch_factor=Config.PREFETCH_FACTOR,
+        persistent_workers=Config.PERSISTENT_WORKERS
     )
 
     val_loader = get_dataloader(
@@ -180,7 +182,8 @@ def main():
         Config.NUM_WORKERS,
         Config.IMAGE_SIZE,
         shuffle=False,
-        prefetch_factor=Config.PREFETCH_FACTOR
+        prefetch_factor=Config.PREFETCH_FACTOR,
+        persistent_workers=Config.PERSISTENT_WORKERS
     )
 
     print(f"Train samples: {len(train_loader.dataset)}, Val samples: {len(val_loader.dataset)}")
