@@ -44,7 +44,7 @@ def calculate_iou(pred, target, num_classes=2):
 
     return np.nanmean(ious)
 
-def train_epoch(model, dataloader, criterion, optimizer, device):
+def train_epoch(model, dataloader, criterion, optimizer, device, use_amp=False, scaler=None):
     model.train()
     total_loss = 0
     total_iou = 0
@@ -55,11 +55,20 @@ def train_epoch(model, dataloader, criterion, optimizer, device):
         labels = labels.to(device)
 
         optimizer.zero_grad()
-        outputs = model(images)
-        loss = criterion(outputs, labels)
 
-        loss.backward()
-        optimizer.step()
+        if use_amp and scaler is not None:
+            with torch.autocast(device_type='cuda', dtype=Config.AMP_dtype):
+                outputs = model(images)
+                loss = criterion(outputs, labels)
+
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
 
         total_loss += loss.item()
 
@@ -71,7 +80,7 @@ def train_epoch(model, dataloader, criterion, optimizer, device):
 
     return total_loss / len(dataloader), total_iou / len(dataloader)
 
-def validate_epoch(model, dataloader, criterion, device):
+def validate_epoch(model, dataloader, criterion, device, use_amp=False):
     model.eval()
     total_loss = 0
     total_iou = 0
@@ -82,8 +91,13 @@ def validate_epoch(model, dataloader, criterion, device):
             images = images.to(device)
             labels = labels.to(device)
 
-            outputs = model(images)
-            loss = criterion(outputs, labels)
+            if use_amp:
+                with torch.autocast(device_type='cuda', dtype=Config.AMP_dtype):
+                    outputs = model(images)
+                    loss = criterion(outputs, labels)
+            else:
+                outputs = model(images)
+                loss = criterion(outputs, labels)
 
             total_loss += loss.item()
 
@@ -95,7 +109,7 @@ def validate_epoch(model, dataloader, criterion, device):
 
     return total_loss / len(dataloader), total_iou / len(dataloader)
 
-def save_predictions(model, dataloader, device, save_dir):
+def save_predictions(model, dataloader, device, save_dir, use_amp=False):
     os.makedirs(save_dir, exist_ok=True)
     model.eval()
 
@@ -104,7 +118,13 @@ def save_predictions(model, dataloader, device, save_dir):
             if i >= 10:
                 break
             images = images.to(device)
-            outputs = model(images)
+
+            if use_amp:
+                with torch.autocast(device_type='cuda', dtype=Config.AMP_dtype):
+                    outputs = model(images)
+            else:
+                outputs = model(images)
+
             preds = torch.argmax(outputs, dim=1)
 
             for j in range(images.size(0)):
@@ -119,8 +139,13 @@ def main():
     device = torch.device(Config.DEVICE)
     print(f"Using device: {device}")
 
+    use_amp = Config.USE_AMP and device.type == 'cuda'
+    print(f"Automatic Mixed Precision (AMP): {'Enabled' if use_amp else 'Disabled'}")
+
     model = UNet(in_channels=Config.IN_CHANNELS, num_classes=Config.NUM_CLASSES).to(device)
     print(f"Model: U-Net with {sum(p.numel() for p in model.parameters())} parameters")
+
+    scaler = torch.amp.GradScaler('cuda') if use_amp else None
 
     train_loader = get_dataloader(
         Config.TRAIN_IMAGES,
@@ -150,8 +175,8 @@ def main():
     for epoch in range(Config.NUM_EPOCHS):
         print(f"\nEpoch {epoch+1}/{Config.NUM_EPOCHS}")
 
-        train_loss, train_iou = train_epoch(model, train_loader, criterion, optimizer, device)
-        val_loss, val_iou = validate_epoch(model, val_loader, criterion, device)
+        train_loss, train_iou = train_epoch(model, train_loader, criterion, optimizer, device, use_amp, scaler)
+        val_loss, val_iou = validate_epoch(model, val_loader, criterion, device, use_amp)
 
         scheduler.step(val_iou)
 
@@ -174,7 +199,7 @@ def main():
     print("\nTraining completed!")
     print(f"Best IoU: {best_iou:.4f}")
 
-    save_predictions(model, val_loader, device, Config.RESULT_DIR)
+    save_predictions(model, val_loader, device, Config.RESULT_DIR, use_amp)
     print(f"Predictions saved to {Config.RESULT_DIR}")
 
 if __name__ == "__main__":

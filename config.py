@@ -24,3 +24,6 @@ class Config:
 
     IN_CHANNELS = 3
     NUM_CLASSES = 2
+
+    USE_AMP = True
+    AMP_dtype = torch.float16
