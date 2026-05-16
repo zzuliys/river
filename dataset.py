@@ -49,6 +49,6 @@ class RiverDataset(Dataset):
         label = torch.from_numpy(label).long() // 255
         return img, label
 
-def get_dataloader(images_dir, labels_dir, batch_size, num_workers, image_size=512, shuffle=True):
+def get_dataloader(images_dir, labels_dir, batch_size, num_workers, image_size=512, shuffle=True, prefetch_factor=2):
     dataset = RiverDataset(images_dir, labels_dir, image_size=image_size)
-    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, pin_memory=True)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, pin_memory=True, prefetch_factor=prefetch_factor)

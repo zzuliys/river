@@ -141,6 +141,7 @@ def main():
 
     use_amp = Config.USE_AMP and device.type == 'cuda'
     print(f"Automatic Mixed Precision (AMP): {'Enabled' if use_amp else 'Disabled'}")
+    print(f"Prefetch Factor: {Config.PREFETCH_FACTOR}")
 
     model = UNet(in_channels=Config.IN_CHANNELS, num_classes=Config.NUM_CLASSES).to(device)
     print(f"Model: U-Net with {sum(p.numel() for p in model.parameters())} parameters")
@@ -153,7 +154,8 @@ def main():
         Config.BATCH_SIZE,
         Config.NUM_WORKERS,
         Config.IMAGE_SIZE,
-        shuffle=True
+        shuffle=True,
+        prefetch_factor=Config.PREFETCH_FACTOR
     )
 
     val_loader = get_dataloader(
@@ -162,7 +164,8 @@ def main():
         Config.BATCH_SIZE,
         Config.NUM_WORKERS,
         Config.IMAGE_SIZE,
-        shuffle=False
+        shuffle=False,
+        prefetch_factor=Config.PREFETCH_FACTOR
     )
 
     print(f"Train samples: {len(train_loader.dataset)}, Val samples: {len(val_loader.dataset)}")
