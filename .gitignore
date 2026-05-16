@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.env
+
+# Data
+kaggle_river/
+train_data/
+val_data/
+*.csv
+*.json
+*.zip
+*.tar
+*.tar.gz
+
+# Models and checkpoints
+checkpoints/
+*.pth
+*.pt
+*.ckpt
+
+# Logs and results
+logs/
+results/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Conda
+conda-lock.yml
