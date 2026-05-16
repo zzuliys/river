@@ -44,14 +44,17 @@ def calculate_iou(pred, target, num_classes=2):
 
     return np.nanmean(ious)
 
-def train_epoch(model, dataloader, criterion, optimizer, device, use_amp=False, scaler=None):
+def train_epoch(model, dataloader, criterion, optimizer, device, use_amp=False, scaler=None, use_channels_last=False):
     model.train()
     total_loss = 0
     total_iou = 0
 
     pbar = tqdm(dataloader, desc="Training")
     for images, labels in pbar:
-        images = images.to(device)
+        if use_channels_last:
+            images = images.to(device, memory_format=torch.channels_last)
+        else:
+            images = images.to(device)
         labels = labels.to(device)
 
         optimizer.zero_grad()
@@ -80,7 +83,7 @@ def train_epoch(model, dataloader, criterion, optimizer, device, use_amp=False, 
 
     return total_loss / len(dataloader), total_iou / len(dataloader)
 
-def validate_epoch(model, dataloader, criterion, device, use_amp=False):
+def validate_epoch(model, dataloader, criterion, device, use_amp=False, use_channels_last=False):
     model.eval()
     total_loss = 0
     total_iou = 0
@@ -88,7 +91,10 @@ def validate_epoch(model, dataloader, criterion, device, use_amp=False):
     with torch.no_grad():
         pbar = tqdm(dataloader, desc="Validation")
         for images, labels in pbar:
-            images = images.to(device)
+            if use_channels_last:
+                images = images.to(device, memory_format=torch.channels_last)
+            else:
+                images = images.to(device)
             labels = labels.to(device)
 
             if use_amp:
@@ -109,7 +115,7 @@ def validate_epoch(model, dataloader, criterion, device, use_amp=False):
 
     return total_loss / len(dataloader), total_iou / len(dataloader)
 
-def save_predictions(model, dataloader, device, save_dir, use_amp=False):
+def save_predictions(model, dataloader, device, save_dir, use_amp=False, use_channels_last=False):
     os.makedirs(save_dir, exist_ok=True)
     model.eval()
 
@@ -117,7 +123,10 @@ def save_predictions(model, dataloader, device, save_dir, use_amp=False):
         for i, (images, _) in enumerate(dataloader):
             if i >= 10:
                 break
-            images = images.to(device)
+            if use_channels_last:
+                images = images.to(device, memory_format=torch.channels_last)
+            else:
+                images = images.to(device)
 
             if use_amp:
                 with torch.autocast(device_type='cuda', dtype=Config.AMP_dtype):
@@ -140,10 +149,16 @@ def main():
     print(f"Using device: {device}")
 
     use_amp = Config.USE_AMP and device.type == 'cuda'
+    use_channels_last = Config.USE_CHANNELS_LAST and device.type == 'cuda'
     print(f"Automatic Mixed Precision (AMP): {'Enabled' if use_amp else 'Disabled'}")
+    print(f"Channels Last Memory Format: {'Enabled' if use_channels_last else 'Disabled'}")
     print(f"Prefetch Factor: {Config.PREFETCH_FACTOR}")
 
     model = UNet(in_channels=Config.IN_CHANNELS, num_classes=Config.NUM_CLASSES).to(device)
+
+    if use_channels_last:
+        model = model.to(memory_format=torch.channels_last)
+
     print(f"Model: U-Net with {sum(p.numel() for p in model.parameters())} parameters")
 
     scaler = torch.amp.GradScaler('cuda') if use_amp else None
@@ -178,8 +193,8 @@ def main():
     for epoch in range(Config.NUM_EPOCHS):
         print(f"\nEpoch {epoch+1}/{Config.NUM_EPOCHS}")
 
-        train_loss, train_iou = train_epoch(model, train_loader, criterion, optimizer, device, use_amp, scaler)
-        val_loss, val_iou = validate_epoch(model, val_loader, criterion, device, use_amp)
+        train_loss, train_iou = train_epoch(model, train_loader, criterion, optimizer, device, use_amp, scaler, use_channels_last)
+        val_loss, val_iou = validate_epoch(model, val_loader, criterion, device, use_amp, use_channels_last)
 
         scheduler.step(val_iou)
 
@@ -202,7 +217,7 @@ def main():
     print("\nTraining completed!")
     print(f"Best IoU: {best_iou:.4f}")
 
-    save_predictions(model, val_loader, device, Config.RESULT_DIR, use_amp)
+    save_predictions(model, val_loader, device, Config.RESULT_DIR, use_amp, use_channels_last)
     print(f"Predictions saved to {Config.RESULT_DIR}")
 
 if __name__ == "__main__":

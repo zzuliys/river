@@ -27,5 +27,7 @@ class Config:
 
     USE_AMP = True
     AMP_dtype = torch.float16
-    
+
     PREFETCH_FACTOR = 2
+
+    USE_CHANNELS_LAST = True
