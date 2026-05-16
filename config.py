@@ -10,10 +10,10 @@ class Config:
     VAL_LABELS = os.path.join(BASE_DIR, "validation", "masks") if os.path.exists(os.path.join(BASE_DIR, "validation", "masks")) else os.path.join(BASE_DIR, "masks")
 
     IMAGE_SIZE = 512
-    BATCH_SIZE = 4
+    BATCH_SIZE = 8
     NUM_EPOCHS = 50
     LEARNING_RATE = 1e-4
-    NUM_WORKERS = 4
+    NUM_WORKERS = 8
 
     LOG_DIR = os.path.join(os.getcwd(), "logs")
     CHECKPOINT_DIR = os.path.join(os.getcwd(), "checkpoints")
