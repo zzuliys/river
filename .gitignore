@@ -25,6 +25,7 @@ checkpoints/
 # Logs and results
 logs/
 results/
+plots/
 *.log
 
 # IDE
