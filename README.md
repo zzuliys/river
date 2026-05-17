@@ -1,6 +1,6 @@
 # river detection
 
-![image](plots/training_progress.png)
+![image](resources/plots/training_progress.png)
 
 ## train
 ```bash
