@@ -39,3 +39,5 @@ class Config:
     USE_COMPILE = True
 
     USE_TF32 = True
+
+    USE_NON_BLOCKING = True

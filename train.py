@@ -44,7 +44,7 @@ def calculate_iou(pred, target, num_classes=2):
 
     return np.nanmean(ious)
 
-def train_epoch(model, dataloader, criterion, optimizer, device, use_amp=False, scaler=None, use_channels_last=False):
+def train_epoch(model, dataloader, criterion, optimizer, device, use_amp=False, scaler=None, use_channels_last=False, non_blocking=False):
     model.train()
     total_loss = 0
     total_iou = 0
@@ -52,10 +52,10 @@ def train_epoch(model, dataloader, criterion, optimizer, device, use_amp=False, 
     pbar = tqdm(dataloader, desc="Training")
     for images, labels in pbar:
         if use_channels_last:
-            images = images.to(device, memory_format=torch.channels_last)
+            images = images.to(device, memory_format=torch.channels_last, non_blocking=non_blocking)
         else:
-            images = images.to(device)
-        labels = labels.to(device)
+            images = images.to(device, non_blocking=non_blocking)
+        labels = labels.to(device, non_blocking=non_blocking)
 
         optimizer.zero_grad()
 
@@ -83,7 +83,7 @@ def train_epoch(model, dataloader, criterion, optimizer, device, use_amp=False, 
 
     return total_loss / len(dataloader), total_iou / len(dataloader)
 
-def validate_epoch(model, dataloader, criterion, device, use_amp=False, use_channels_last=False):
+def validate_epoch(model, dataloader, criterion, device, use_amp=False, use_channels_last=False, non_blocking=False):
     model.eval()
     total_loss = 0
     total_iou = 0
@@ -92,10 +92,10 @@ def validate_epoch(model, dataloader, criterion, device, use_amp=False, use_chan
         pbar = tqdm(dataloader, desc="Validation")
         for images, labels in pbar:
             if use_channels_last:
-                images = images.to(device, memory_format=torch.channels_last)
+                images = images.to(device, memory_format=torch.channels_last, non_blocking=non_blocking)
             else:
-                images = images.to(device)
-            labels = labels.to(device)
+                images = images.to(device, non_blocking=non_blocking)
+            labels = labels.to(device, non_blocking=non_blocking)
 
             if use_amp:
                 with torch.autocast(device_type='cuda', dtype=Config.AMP_dtype):
@@ -115,7 +115,7 @@ def validate_epoch(model, dataloader, criterion, device, use_amp=False, use_chan
 
     return total_loss / len(dataloader), total_iou / len(dataloader)
 
-def save_predictions(model, dataloader, device, save_dir, use_amp=False, use_channels_last=False):
+def save_predictions(model, dataloader, device, save_dir, use_amp=False, use_channels_last=False, non_blocking=False):
     os.makedirs(save_dir, exist_ok=True)
     model.eval()
 
@@ -124,9 +124,9 @@ def save_predictions(model, dataloader, device, save_dir, use_amp=False, use_cha
             if i >= 10:
                 break
             if use_channels_last:
-                images = images.to(device, memory_format=torch.channels_last)
+                images = images.to(device, memory_format=torch.channels_last, non_blocking=non_blocking)
             else:
-                images = images.to(device)
+                images = images.to(device, non_blocking=non_blocking)
 
             if use_amp:
                 with torch.autocast(device_type='cuda', dtype=Config.AMP_dtype):
@@ -150,6 +150,7 @@ def main():
 
     use_amp = Config.USE_AMP and device.type == 'cuda'
     use_channels_last = Config.USE_CHANNELS_LAST and device.type == 'cuda'
+    non_blocking = Config.USE_NON_BLOCKING and device.type == 'cuda'
     if Config.CUDNN_BENCHMARK and device.type == 'cuda':
         torch.backends.cudnn.benchmark = True
     if Config.USE_TF32 and device.type == 'cuda':
@@ -158,6 +159,8 @@ def main():
     print(f"Automatic Mixed Precision (AMP): {'Enabled' if use_amp else 'Disabled'}")
     print(f"Channels Last Memory Format: {'Enabled' if use_channels_last else 'Disabled'}")
     print(f"cudnn Benchmark: {'Enabled' if (Config.CUDNN_BENCHMARK and device.type == 'cuda') else 'Disabled'}")
+    print(f"TF32: {'Enabled' if (Config.USE_TF32 and device.type == 'cuda') else 'Disabled'}")
+    print(f"Non-Blocking Transfer: {'Enabled' if non_blocking else 'Disabled'}")
     print(f"Prefetch Factor: {Config.PREFETCH_FACTOR}")
     print(f"Persistent Workers: {'Enabled' if Config.PERSISTENT_WORKERS else 'Disabled'}")
 
@@ -206,8 +209,8 @@ def main():
     for epoch in range(Config.NUM_EPOCHS):
         print(f"\nEpoch {epoch+1}/{Config.NUM_EPOCHS}")
 
-        train_loss, train_iou = train_epoch(model, train_loader, criterion, optimizer, device, use_amp, scaler, use_channels_last)
-        val_loss, val_iou = validate_epoch(model, val_loader, criterion, device, use_amp, use_channels_last)
+        train_loss, train_iou = train_epoch(model, train_loader, criterion, optimizer, device, use_amp, scaler, use_channels_last, non_blocking)
+        val_loss, val_iou = validate_epoch(model, val_loader, criterion, device, use_amp, use_channels_last, non_blocking)
 
         scheduler.step(val_iou)
 
@@ -230,7 +233,7 @@ def main():
     print("\nTraining completed!")
     print(f"Best IoU: {best_iou:.4f}")
 
-    save_predictions(model, val_loader, device, Config.RESULT_DIR, use_amp, use_channels_last)
+    save_predictions(model, val_loader, device, Config.RESULT_DIR, use_amp, use_channels_last, non_blocking)
     print(f"Predictions saved to {Config.RESULT_DIR}")
 
 if __name__ == "__main__":
