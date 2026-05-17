@@ -41,3 +41,5 @@ class Config:
     USE_TF32 = True
 
     USE_NON_BLOCKING = True
+
+    PLOTS_DIR = os.path.join(os.getcwd(), "plots")

@@ -7,6 +7,9 @@ import torch.optim as optim
 from tqdm import tqdm
 import numpy as np
 import cv2
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 from config import Config
 from model import UNet
@@ -203,10 +206,44 @@ def save_predictions(model, dataloader, device, save_dir, use_amp=False, use_cha
                 pred_mask = preds[j].cpu().numpy() * 255
                 cv2.imwrite(os.path.join(save_dir, f'pred_{i}_{j}.png'), pred_mask)
 
+def plot_training_curves(history, save_dir):
+    epochs = list(range(1, len(history['train_loss']) + 1))
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    fig.suptitle('Training Progress', fontsize=14, fontweight='bold')
+
+    ax = axes[0]
+    ax.plot(epochs, history['train_loss'], 'b-', linewidth=1.2, label='Train Loss')
+    ax.plot(epochs, history['val_loss'], 'r-', linewidth=1.2, label='Val Loss')
+    ax.set_xlabel('Epoch')
+    ax.set_ylabel('Loss')
+    ax.set_title('Loss Curve')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+
+    ax = axes[1]
+    ax.plot(epochs, history['train_iou'], 'b-', linewidth=1.2, label='Train IoU')
+    ax.plot(epochs, history['val_iou'], 'r-', linewidth=1.2, label='Val IoU')
+    if history['best_iou']:
+        best_epoch = history['best_epoch'][-1]
+        best_val = history['best_iou'][-1]
+        ax.scatter(best_epoch, best_val, color='red', s=80, zorder=5, label=f'Best@{best_epoch}: {best_val:.4f}')
+        ax.legend()
+    ax.set_xlabel('Epoch')
+    ax.set_ylabel('IoU')
+    ax.set_title('IoU Curve')
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    path = os.path.join(save_dir, 'training_progress.png')
+    plt.savefig(path, dpi=100, bbox_inches='tight')
+    plt.close()
+    return path
+
 def main():
     os.makedirs(Config.LOG_DIR, exist_ok=True)
     os.makedirs(Config.CHECKPOINT_DIR, exist_ok=True)
     os.makedirs(Config.RESULT_DIR, exist_ok=True)
+    os.makedirs(Config.PLOTS_DIR, exist_ok=True)
 
     log_file = os.path.join(Config.LOG_DIR, 'training.log')
     file_handler = logging.FileHandler(log_file)
@@ -274,6 +311,12 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, fused=True)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', patience=5, factor=0.5)
 
+    history = {
+        'train_loss': [], 'val_loss': [],
+        'train_iou': [], 'val_iou': [],
+        'best_iou': [], 'best_epoch': []
+    }
+
     best_iou = 0
     for epoch in range(Config.NUM_EPOCHS):
         print(f"\nEpoch {epoch+1}/{Config.NUM_EPOCHS}")
@@ -283,13 +326,23 @@ def main():
 
         scheduler.step(val_iou)
 
-        print(f"Train Loss: {train_loss:.4f}, Train IoU: {train_iou:.4f}")
-        print(f"Val Loss: {val_loss:.4f}, Val IoU: {val_iou:.4f}")
+        history['train_loss'].append(train_loss)
+        history['val_loss'].append(val_loss)
+        history['train_iou'].append(train_iou)
+        history['val_iou'].append(val_iou)
 
         if val_iou > best_iou:
             best_iou = val_iou
+            history['best_iou'].append(best_iou)
+            history['best_epoch'].append(epoch + 1)
             torch.save(model.state_dict(), os.path.join(Config.CHECKPOINT_DIR, 'best_model.pth'))
             print(f"Saved best model with IoU: {best_iou:.4f}")
+
+        plot_path = plot_training_curves(history, Config.PLOTS_DIR)
+        logger.info(f"Epoch {epoch+1} plot saved: {plot_path}")
+
+        print(f"Train Loss: {train_loss:.4f}, Train IoU: {train_iou:.4f}")
+        print(f"Val Loss: {val_loss:.4f}, Val IoU: {val_iou:.4f}")
 
         if (epoch + 1) % 10 == 0:
             torch.save({
