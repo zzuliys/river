@@ -1,4 +1,6 @@
 import os
+import time
+import logging
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -9,6 +11,13 @@ import cv2
 from config import Config
 from model import UNet
 from dataset import get_dataloader
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 def dice_loss(pred, target, smooth=1.0):
     pred = torch.softmax(pred, dim=1)
@@ -44,42 +53,96 @@ def calculate_iou(pred, target, num_classes=2):
 
     return np.nanmean(ious)
 
-def train_epoch(model, dataloader, criterion, optimizer, device, use_amp=False, scaler=None, use_channels_last=False, non_blocking=False):
+def train_epoch(model, dataloader, criterion, optimizer, device, epoch, use_amp=False, scaler=None, use_channels_last=False, non_blocking=False):
     model.train()
     total_loss = 0
     total_iou = 0
+    log_batches = 5
+
+    timings = {'data': [], 'forward': [], 'loss': [], 'backward': [], 'step': [], 'total': []}
 
     pbar = tqdm(dataloader, desc="Training")
-    for images, labels in pbar:
+    for batch_idx, (images, labels) in enumerate(pbar):
+        t0 = time.time()
+
         if use_channels_last:
             images = images.to(device, memory_format=torch.channels_last, non_blocking=non_blocking)
         else:
             images = images.to(device, non_blocking=non_blocking)
         labels = labels.to(device, non_blocking=non_blocking)
+        torch.cuda.synchronize()
+        t_data = time.time()
 
         optimizer.zero_grad()
 
         if use_amp and scaler is not None:
             with torch.autocast(device_type='cuda', dtype=Config.AMP_dtype):
                 outputs = model(images)
+                torch.cuda.synchronize()
+                t_forward = time.time()
                 loss = criterion(outputs, labels)
-
+                torch.cuda.synchronize()
+                t_loss = time.time()
             scaler.scale(loss).backward()
+            torch.cuda.synchronize()
+            t_backward = time.time()
             scaler.step(optimizer)
             scaler.update()
         else:
             outputs = model(images)
+            torch.cuda.synchronize()
+            t_forward = time.time()
             loss = criterion(outputs, labels)
+            torch.cuda.synchronize()
+            t_loss = time.time()
             loss.backward()
+            torch.cuda.synchronize()
+            t_backward = time.time()
             optimizer.step()
 
-        total_loss += loss.item()
+        torch.cuda.synchronize()
+        t_step = time.time()
 
+        if batch_idx < log_batches:
+            d_data = (t_data - t0) * 1000
+            d_forward = (t_forward - t_data) * 1000
+            d_loss = (t_loss - t_forward) * 1000
+            d_backward = (t_backward - t_loss) * 1000
+            d_step = (t_step - t_backward) * 1000
+            d_total = (t_step - t0) * 1000
+            timings['data'].append(d_data)
+            timings['forward'].append(d_forward)
+            timings['loss'].append(d_loss)
+            timings['backward'].append(d_backward)
+            timings['step'].append(d_step)
+            timings['total'].append(d_total)
+            logger.info(
+                f"Epoch {epoch} Batch {batch_idx:03d} | "
+                f"data: {d_data:6.2f}ms | "
+                f"forward: {d_forward:6.2f}ms | "
+                f"loss: {d_loss:6.2f}ms | "
+                f"backward: {d_backward:6.2f}ms | "
+                f"step: {d_step:6.2f}ms | "
+                f"total: {d_total:6.2f}ms"
+            )
+
+        total_loss += loss.item()
         pred = torch.argmax(outputs, dim=1)
         iou = calculate_iou(pred, labels)
         total_iou += iou
-
         pbar.set_postfix({'loss': f'{loss.item():.4f}', 'iou': f'{iou:.4f}'})
+
+    if timings['total']:
+        avg = {k: sum(v) / len(v) for k, v in timings.items()}
+        logger.info(
+            f"Epoch {epoch} AVG | "
+            f"data: {avg['data']:6.2f}ms | "
+            f"forward: {avg['forward']:6.2f}ms | "
+            f"loss: {avg['loss']:6.2f}ms | "
+            f"backward: {avg['backward']:6.2f}ms | "
+            f"step: {avg['step']:6.2f}ms | "
+            f"total: {avg['total']:6.2f}ms"
+        )
 
     return total_loss / len(dataloader), total_iou / len(dataloader)
 
@@ -145,6 +208,12 @@ def main():
     os.makedirs(Config.CHECKPOINT_DIR, exist_ok=True)
     os.makedirs(Config.RESULT_DIR, exist_ok=True)
 
+    log_file = os.path.join(Config.LOG_DIR, 'training.log')
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S'))
+    logger.addHandler(file_handler)
+    logger.info(f"Log file: {log_file}")
+
     device = torch.device(Config.DEVICE)
     print(f"Using device: {device}")
 
@@ -209,7 +278,7 @@ def main():
     for epoch in range(Config.NUM_EPOCHS):
         print(f"\nEpoch {epoch+1}/{Config.NUM_EPOCHS}")
 
-        train_loss, train_iou = train_epoch(model, train_loader, criterion, optimizer, device, use_amp, scaler, use_channels_last, non_blocking)
+        train_loss, train_iou = train_epoch(model, train_loader, criterion, optimizer, device, epoch+1, use_amp, scaler, use_channels_last, non_blocking)
         val_loss, val_iou = validate_epoch(model, val_loader, criterion, device, use_amp, use_channels_last, non_blocking)
 
         scheduler.step(val_iou)
