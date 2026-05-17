@@ -7,7 +7,7 @@ __pycache__/
 .env
 
 # Data
-kaggle_river/
+kaggle_river
 train_data/
 val_data/
 *.csv
