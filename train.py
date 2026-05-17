@@ -150,8 +150,11 @@ def main():
 
     use_amp = Config.USE_AMP and device.type == 'cuda'
     use_channels_last = Config.USE_CHANNELS_LAST and device.type == 'cuda'
+    if Config.CUDNN_BENCHMARK and device.type == 'cuda':
+        torch.backends.cudnn.benchmark = True
     print(f"Automatic Mixed Precision (AMP): {'Enabled' if use_amp else 'Disabled'}")
     print(f"Channels Last Memory Format: {'Enabled' if use_channels_last else 'Disabled'}")
+    print(f"cudnn Benchmark: {'Enabled' if (Config.CUDNN_BENCHMARK and device.type == 'cuda') else 'Disabled'}")
     print(f"Prefetch Factor: {Config.PREFETCH_FACTOR}")
     print(f"Persistent Workers: {'Enabled' if Config.PERSISTENT_WORKERS else 'Disabled'}")
 

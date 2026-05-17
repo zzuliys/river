@@ -11,7 +11,7 @@ class Config:
 
     IMAGE_SIZE = 512
     BATCH_SIZE = 8
-    NUM_EPOCHS = 50
+    NUM_EPOCHS = 200
     LEARNING_RATE = 1e-4
     NUM_WORKERS = 8
 
@@ -33,3 +33,5 @@ class Config:
     USE_CHANNELS_LAST = True
 
     PERSISTENT_WORKERS = True
+
+    CUDNN_BENCHMARK = True
