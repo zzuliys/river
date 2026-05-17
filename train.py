@@ -163,7 +163,11 @@ def main():
     if use_channels_last:
         model = model.to(memory_format=torch.channels_last)
 
+    use_compile = Config.USE_COMPILE and hasattr(torch, 'compile')
+    if use_compile:
+        model = torch.compile(model, mode="reduce-overhead")
     print(f"Model: U-Net with {sum(p.numel() for p in model.parameters())} parameters")
+    print(f"torch.compile: {'Enabled' if use_compile else 'Disabled'}")
 
     scaler = torch.amp.GradScaler('cuda') if use_amp else None
 

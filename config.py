@@ -35,3 +35,5 @@ class Config:
     PERSISTENT_WORKERS = True
 
     CUDNN_BENCHMARK = True
+
+    USE_COMPILE = True
