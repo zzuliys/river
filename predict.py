@@ -18,11 +18,18 @@ def load_model(model_path, use_channels_last=False):
     return model
 
 def preprocess_image(image_path):
+    mean = [0.485, 0.456, 0.406]
+    std = [0.229, 0.224, 0.225]
+    if Config.USE_PREPROC:
+        meta = torch.load(os.path.join(Config.PREPROC_DIR, "meta.pt"), map_location="cpu")
+        mean = meta["mean"]
+        std = meta["std"]
+
     img = cv2.imread(image_path)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     img = cv2.resize(img, (Config.IMAGE_SIZE, Config.IMAGE_SIZE))
     img = img / 255.0
-    img = (img - [0.485, 0.456, 0.406]) / [0.229, 0.224, 0.225]
+    img = (img - mean) / std
     img = torch.from_numpy(img).permute(2, 0, 1).float()
     img = img.unsqueeze(0)
     return img

@@ -4,6 +4,7 @@ import logging
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 import numpy as np
 import cv2
@@ -13,7 +14,7 @@ import matplotlib.pyplot as plt
 
 from config import Config
 from model import UNet
-from dataset import get_dataloader
+from dataset import get_dataloader, PreprocessedDataset
 from download_dataset import download_dataset
 
 logging.basicConfig(
@@ -286,27 +287,46 @@ def main():
 
     scaler = torch.amp.GradScaler('cuda') if use_amp else None
 
-    train_loader = get_dataloader(
-        Config.TRAIN_IMAGES,
-        Config.TRAIN_LABELS,
-        Config.BATCH_SIZE,
-        Config.NUM_WORKERS,
-        Config.IMAGE_SIZE,
-        shuffle=True,
-        prefetch_factor=Config.PREFETCH_FACTOR,
-        persistent_workers=Config.PERSISTENT_WORKERS
-    )
+    use_preproc = Config.USE_PREPROC
+    print(f"Preprocessed Data: {'Available' if use_preproc else 'Not found (raw images)'}")
 
-    val_loader = get_dataloader(
-        Config.VAL_IMAGES,
-        Config.VAL_LABELS,
-        Config.BATCH_SIZE,
-        Config.NUM_WORKERS,
-        Config.IMAGE_SIZE,
-        shuffle=False,
-        prefetch_factor=Config.PREFETCH_FACTOR,
-        persistent_workers=Config.PERSISTENT_WORKERS
-    )
+    if use_preproc:
+        meta = torch.load(os.path.join(Config.PREPROC_DIR, "meta.pt"), map_location="cpu")
+        train_dataset = PreprocessedDataset(os.path.join(Config.PREPROC_DIR, "train"), meta['mean'], meta['std'])
+        val_dataset = PreprocessedDataset(os.path.join(Config.PREPROC_DIR, "val"), meta['mean'], meta['std'])
+        train_loader = DataLoader(
+            train_dataset, batch_size=Config.BATCH_SIZE, shuffle=True,
+            num_workers=Config.NUM_WORKERS, pin_memory=True,
+            prefetch_factor=Config.PREFETCH_FACTOR,
+            persistent_workers=Config.PERSISTENT_WORKERS
+        )
+        val_loader = DataLoader(
+            val_dataset, batch_size=Config.BATCH_SIZE, shuffle=False,
+            num_workers=Config.NUM_WORKERS, pin_memory=True,
+            prefetch_factor=Config.PREFETCH_FACTOR,
+            persistent_workers=Config.PERSISTENT_WORKERS
+        )
+    else:
+        train_loader = get_dataloader(
+            Config.TRAIN_IMAGES,
+            Config.TRAIN_LABELS,
+            Config.BATCH_SIZE,
+            Config.NUM_WORKERS,
+            Config.IMAGE_SIZE,
+            shuffle=True,
+            prefetch_factor=Config.PREFETCH_FACTOR,
+            persistent_workers=Config.PERSISTENT_WORKERS
+        )
+        val_loader = get_dataloader(
+            Config.VAL_IMAGES,
+            Config.VAL_LABELS,
+            Config.BATCH_SIZE,
+            Config.NUM_WORKERS,
+            Config.IMAGE_SIZE,
+            shuffle=False,
+            prefetch_factor=Config.PREFETCH_FACTOR,
+            persistent_workers=Config.PERSISTENT_WORKERS
+        )
 
     print(f"Train samples: {len(train_loader.dataset)}, Val samples: {len(val_loader.dataset)}")
 

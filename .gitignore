@@ -8,6 +8,7 @@ __pycache__/
 
 # Data
 kaggle_river
+preprocessed_data/
 train_data/
 val_data/
 *.csv

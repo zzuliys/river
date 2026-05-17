@@ -43,3 +43,6 @@ class Config:
     USE_NON_BLOCKING = True
 
     PLOTS_DIR = os.path.join(os.getcwd(), "plots")
+
+    PREPROC_DIR = os.path.join(os.getcwd(), "preprocessed_data")
+    USE_PREPROC = os.path.isdir(PREPROC_DIR)
