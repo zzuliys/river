@@ -5,10 +5,15 @@ import numpy as np
 from model import UNet
 from config import Config
 
-def load_model(model_path):
+def load_model(model_path, use_channels_last=False):
     model = UNet(in_channels=Config.IN_CHANNELS, num_classes=Config.NUM_CLASSES)
-    model.load_state_dict(torch.load(model_path, map_location=Config.DEVICE))
+    state_dict = torch.load(model_path, map_location=Config.DEVICE)
+    if any(k.startswith('_orig_mod.') for k in state_dict.keys()):
+        state_dict = {k.replace('_orig_mod.', ''): v for k, v in state_dict.items()}
+    model.load_state_dict(state_dict)
     model.to(Config.DEVICE)
+    if use_channels_last:
+        model = model.to(memory_format=torch.channels_last)
     model.eval()
     return model
 
@@ -22,9 +27,12 @@ def preprocess_image(image_path):
     img = img.unsqueeze(0)
     return img
 
-def predict_image(model, image_path):
+def predict_image(model, image_path, non_blocking=False, use_channels_last=False):
     img = preprocess_image(image_path)
-    img = img.to(Config.DEVICE)
+    if use_channels_last:
+        img = img.to(Config.DEVICE, memory_format=torch.channels_last, non_blocking=non_blocking)
+    else:
+        img = img.to(Config.DEVICE, non_blocking=non_blocking)
     
     with torch.no_grad():
         output = model(img)
@@ -59,10 +67,16 @@ def main():
         print(f"模型文件不存在: {model_path}")
         return
     
-    model = load_model(model_path)
+    device = torch.device(Config.DEVICE)
+    use_channels_last = Config.USE_CHANNELS_LAST and device.type == 'cuda'
+    non_blocking = Config.USE_NON_BLOCKING and device.type == 'cuda'
+    print(f"Channels Last: {'Enabled' if use_channels_last else 'Disabled'}")
+    print(f"Non-Blocking Transfer: {'Enabled' if non_blocking else 'Disabled'}")
+
+    model = load_model(model_path, use_channels_last)
     print(f"模型加载成功: {model_path}")
     
-    test_dir = os.path.join(Config.BASE_DIR, "test", "images")
+    test_dir = os.path.join(Config.BASE_DIR, "images")
     if not os.path.exists(test_dir):
         print(f"测试目录不存在: {test_dir}")
         return
@@ -76,7 +90,7 @@ def main():
     
     for i, filename in enumerate(test_files):
         image_path = os.path.join(test_dir, filename)
-        pred_mask = predict_image(model, image_path)
+        pred_mask = predict_image(model, image_path, non_blocking, use_channels_last)
         
         overlay_img = overlay_mask_on_image(image_path, pred_mask, alpha=0.5)
         
