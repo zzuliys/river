@@ -202,7 +202,7 @@ def main():
     print(f"Train samples: {len(train_loader.dataset)}, Val samples: {len(val_loader.dataset)}")
 
     criterion = combined_loss
-    optimizer = optim.Adam(model.parameters(), lr=Config.LEARNING_RATE)
+    optimizer = optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, fused=True)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', patience=5, factor=0.5)
 
     best_iou = 0
