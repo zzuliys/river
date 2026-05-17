@@ -152,6 +152,9 @@ def main():
     use_channels_last = Config.USE_CHANNELS_LAST and device.type == 'cuda'
     if Config.CUDNN_BENCHMARK and device.type == 'cuda':
         torch.backends.cudnn.benchmark = True
+    if Config.USE_TF32 and device.type == 'cuda':
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
     print(f"Automatic Mixed Precision (AMP): {'Enabled' if use_amp else 'Disabled'}")
     print(f"Channels Last Memory Format: {'Enabled' if use_channels_last else 'Disabled'}")
     print(f"cudnn Benchmark: {'Enabled' if (Config.CUDNN_BENCHMARK and device.type == 'cuda') else 'Disabled'}")

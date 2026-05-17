@@ -37,3 +37,5 @@ class Config:
     CUDNN_BENCHMARK = True
 
     USE_COMPILE = True
+
+    USE_TF32 = True
