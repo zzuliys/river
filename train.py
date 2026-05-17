@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 from config import Config
 from model import UNet
 from dataset import get_dataloader
+from download_dataset import download_dataset
 
 logging.basicConfig(
     level=logging.INFO,
@@ -244,6 +245,8 @@ def main():
     os.makedirs(Config.CHECKPOINT_DIR, exist_ok=True)
     os.makedirs(Config.RESULT_DIR, exist_ok=True)
     os.makedirs(Config.PLOTS_DIR, exist_ok=True)
+
+    download_dataset()
 
     log_file = os.path.join(Config.LOG_DIR, 'training.log')
     file_handler = logging.FileHandler(log_file)
