@@ -1,8 +1,10 @@
 import os
 import torch
 
+_PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 class Config:
-    BASE_DIR = "/home/daiyin/data/code/river/kaggle_river/riwa_v2"
+    BASE_DIR = os.path.join(_PROJECT_DIR, "kaggle_river", "riwa_v2")
     TRAIN_IMAGES = os.path.join(BASE_DIR, "images")
     TRAIN_LABELS = os.path.join(BASE_DIR, "masks")
 
@@ -15,9 +17,9 @@ class Config:
     LEARNING_RATE = 1e-4
     NUM_WORKERS = 8
 
-    LOG_DIR = os.path.join(os.getcwd(), "logs")
-    CHECKPOINT_DIR = os.path.join(os.getcwd(), "checkpoints")
-    RESULT_DIR = os.path.join(os.getcwd(), "results")
+    LOG_DIR = os.path.join(_PROJECT_DIR, "logs")
+    CHECKPOINT_DIR = os.path.join(_PROJECT_DIR, "checkpoints")
+    RESULT_DIR = os.path.join(_PROJECT_DIR, "results")
 
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
     PIN_MEMORY = True
@@ -42,7 +44,7 @@ class Config:
 
     USE_NON_BLOCKING = True
 
-    PLOTS_DIR = os.path.join(os.getcwd(), "plots")
+    PLOTS_DIR = os.path.join(_PROJECT_DIR, "plots")
 
-    PREPROC_DIR = os.path.join(os.getcwd(), "preprocessed_data")
+    PREPROC_DIR = os.path.join(_PROJECT_DIR, "preprocessed_data")
     USE_PREPROC = os.path.isdir(PREPROC_DIR)

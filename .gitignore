@@ -7,10 +7,10 @@ __pycache__/
 .env
 
 # Data
-kaggle_river
-preprocessed_data/
-train_data/
-val_data/
+segment/kaggle_river
+segment/preprocessed_data/
+segment/train_data/
+segment/val_data/
 *.csv
 *.json
 *.zip
@@ -18,15 +18,15 @@ val_data/
 *.tar.gz
 
 # Models and checkpoints
-checkpoints/
+segment/checkpoints/
 *.pth
 *.pt
 *.ckpt
 
 # Logs and results
-logs/
-results/
-plots/
+segment/logs/
+segment/results/
+segment/plots/
 *.log
 
 # IDE
