@@ -11,6 +11,7 @@ segment/kaggle_river
 segment/preprocessed_data/
 segment/train_data/
 segment/val_data/
+detection/VOC2007_yolo/
 *.csv
 *.json
 *.zip
@@ -19,6 +20,7 @@ segment/val_data/
 
 # Models and checkpoints
 segment/checkpoints/
+detection/checkpoints/
 *.pth
 *.pt
 *.ckpt
@@ -27,6 +29,9 @@ segment/checkpoints/
 segment/logs/
 segment/results/
 segment/plots/
+detection/logs/
+detection/results/
+detection/plots/
 *.log
 
 # IDE
